@@ -7,6 +7,7 @@ contract DecentralizedEscrow is ReentrancyGuard {
     error Client__AlreadeyHaveAccount();
     error Freelancer__AlreadeyHaveAccount();
     error Client__CreateProject();
+    
     error Client__DeadLine();
     error Client__Balance();
     error Client__RoleNotMatch();
