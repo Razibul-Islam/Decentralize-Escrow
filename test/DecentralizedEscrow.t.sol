@@ -7,10 +7,12 @@ import {DecentralizedEscrow} from "../src/DecentralizedEscrow.sol";
 contract TestingDecentralizedEscrow is Test {
     DecentralizedEscrow decentralizedEscrow;
     address user = makeAddr("user");
+    address deployer = makeAddr("Deployer");
 
     uint256 public constant AMOUNT = 2 ether;
 
     function setUp() public {
+        vm.prank(deployer);
         decentralizedEscrow = new DecentralizedEscrow();
         vm.deal(user, AMOUNT);
     }
@@ -209,5 +211,33 @@ contract TestingDecentralizedEscrow is Test {
 
         vm.prank(user);
         decentralizedEscrow.rejectProject(1);
+    }
+
+    function testResolveDisput() external RegClient {
+        address freelancer = makeAddr("Freelancer");
+        uint256 deadline = block.timestamp + 7 days;
+
+        vm.prank(freelancer);
+        decentralizedEscrow.register(
+            uint8(DecentralizedEscrow.Role.Freelancer)
+        );
+
+        vm.prank(user);
+        decentralizedEscrow.createProject{value: 0.5 ether}(
+            0.5 ether,
+            deadline
+        );
+
+        vm.prank(freelancer);
+        decentralizedEscrow.acceptProject(1);
+
+        vm.prank(freelancer);
+        decentralizedEscrow.submitProject(1);
+
+        vm.prank(user);
+        decentralizedEscrow.rejectProject(1);
+
+        vm.prank(deployer);
+        decentralizedEscrow.resolveDisput(1,0.25 ether, 0.25 ether);
     }
 }

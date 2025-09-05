@@ -72,10 +72,27 @@ contract DecentralizedEscrow is ReentrancyGuard {
     event SubmitProject(address indexed from, address indexed to, uint256 id);
     event ApproveProject(uint256 indexed id);
     event ProjectDisputed(uint256 indexed id);
+    event ProjectResolved(
+        uint256 indexed id,
+        address client,
+        address freelancer,
+        uint256 clientAmount,
+        uint256 freelancerAmount
+    );
 
     address[] clients;
     address[] freelancers;
     uint256 public id;
+    address public admin;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(admin == msg.sender, "You are not admin");
+        _;
+    }
 
     function register(uint8 rol) external {
         if (rol == uint8(Role.Client)) {
@@ -190,12 +207,60 @@ contract DecentralizedEscrow is ReentrancyGuard {
         );
 
         projects[projectId].status = ProjectStatus.Disputed;
-        // Dispute Resolution here
 
         emit ProjectDisputed(projectId);
     }
 
+    function resolveDisput(
+        uint256 projectId,
+        uint256 clientAmount,
+        uint256 freelancerAmount
+    ) external nonReentrant onlyAdmin {
+        require(idExist[projectId], Client__ProjectNotExits());
+        require(
+            projects[projectId].status == ProjectStatus.Disputed,
+            "Not Disput"
+        );
+        require(
+            clientAmount + freelancerAmount == projects[projectId].amount,
+            "Invalid Split"
+        );
+
+        _handleDisputeResolution(projectId, clientAmount, freelancerAmount);
+    }
+
     // Internal Functions
+
+    function _handleDisputeResolution(
+        uint256 projectId,
+        uint256 clientAmount,
+        uint256 freelancerAmount
+    ) internal {
+        projects[projectId].status = ProjectStatus.Resolved;
+
+        if (clientAmount > 0) {
+            (bool success, ) = projects[projectId].client.call{
+                value: clientAmount
+            }("");
+            require(success, "Refund to client faild");
+        }
+
+        if (freelancerAmount > 0) {
+            (bool success, ) = projects[projectId].freelancer.call{
+                value: freelancerAmount
+            }("");
+            require(success, "Refund to Freelancer faild");
+        }
+
+        emit ProjectResolved(
+            projectId,
+            projects[projectId].client,
+            projects[projectId].freelancer,
+            clientAmount,
+            freelancerAmount
+        );
+    }
+
     function registerAsClient() internal {
         require(msg.sender != address(0), "Invalid Address");
 
