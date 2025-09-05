@@ -2,23 +2,23 @@
 
 ## 📌 Overview
 
-The Escrow Smart Contract provides a trustless payment solution for freelance work and peer-to-peer transactions.  
-It ensures that funds are securely locked until project conditions are met, reducing the risk of fraud or non-payment.
+The Decentralized Escrow Smart Contract enables secure, trustless payments for freelance and peer-to-peer transactions.  
+Funds are locked until project conditions are met, minimizing fraud and non-payment risks.
 
-- **Clients** deposit funds into escrow.
-- **Freelancers** receive payment once the client confirms delivery or after an auto-release time-lock.
-- **Disputes** can optionally be resolved by an arbitrator (owner or DAO).
+- **Clients** deposit ETH or ERC20 tokens into escrow.
+- **Freelancers** receive payment after client confirmation or auto-release.
+- **Disputes** can be resolved by an arbitrator (owner or DAO).
 
 ---
 
 ## 🚀 Features
 
-- **Secure Escrow Payments:** Supports ETH or ERC20 deposits.
+- **Supports ETH & ERC20:** Accepts both native ETH and ERC20 tokens.
 - **Two-Party Workflow:** Client deposits → Freelancer delivers → Client confirms → Funds released.
-- **Auto-Release:** If the client doesn’t respond before the deadline, payment is auto-released to the freelancer.
-- **Dispute Handling:** Owner/DAO can resolve disputes by releasing funds to either party.
-- **Platform Fee:** Percentage fee for platform sustainability.
-- **Reentrancy Protection:** Secure withdrawals.
+- **Auto-Release:** If the client is inactive past the deadline, funds auto-release to the freelancer.
+- **Dispute Resolution:** Arbitrator can resolve disputes and release funds to either party.
+- **Platform Fee:** A configurable percentage fee is deducted for platform sustainability.
+- **Reentrancy Protection:** Secure withdrawals using `ReentrancyGuard`.
 
 ---
 
@@ -28,21 +28,20 @@ It ensures that funds are securely locked until project conditions are met, redu
 
 ```solidity
 struct Escrow {
-    address client;         // The payer who creates the escrow
-    address freelancer;     // The receiver who will be paid
-    uint256 amount;         // Escrowed amount
-    IERC20 token;           // ERC20 token address (or address(0) for ETH)
-    uint256 deadline;       // Timestamp for auto-release
-    bool released;          // Whether escrow is already resolved
-    bool disputed;          // Whether escrow is in dispute
+    address client;         // Payer
+    address freelancer;     // Payee
+    uint256 amount;         // Amount in escrow
+    uint256 deadline;       // Auto-release timestamp
+    bool released;          // True if escrow resolved
+    bool disputed;          // True if in dispute
 }
 ```
 
-- `mapping(uint256 => Escrow)` — Tracks escrows by ID
-- `uint256 public escrowCount` — Incremental counter for new escrows
-- `uint16 public platformFeeBps` — Platform fee in basis points (1% = 100)
-- `address public platformWallet` — Fee receiver
-- `address public arbitrator` — Address responsible for dispute resolution
+- `mapping(uint256 => Escrow) public escrows;` — Escrows by ID
+- `uint256 public escrowCount;` — Escrow counter
+- `uint16 public platformFeeBps;` — Platform fee (basis points)
+- `address public platformWallet;` — Fee receiver
+- `address public arbitrator;` — Dispute resolver
 
 ---
 
@@ -50,41 +49,41 @@ struct Escrow {
 
 ### Escrow Lifecycle
 
-- `createEscrow(address freelancer, IERC20 token, uint256 amount, uint256 duration)`  
-  Client deposits ETH or ERC20 into escrow.
+- `function createEscrow(address freelancer, IERC20 token, uint256 amount, uint256 duration) external payable`  
+  Client deposits ETH or ERC20 tokens into escrow.
 
-- `releaseEscrow(uint256 escrowId)`  
-  Client confirms completion; funds are released.
+- `function releaseEscrow(uint256 escrowId) external`  
+  Client confirms completion; funds released to freelancer.
 
-- `autoRelease(uint256 escrowId)`  
-  Anyone can call after the deadline; funds are released to the freelancer.
+- `function autoRelease(uint256 escrowId) external`  
+  Anyone can call after deadline; funds released to freelancer.
 
 ### Dispute Handling
 
-- `raiseDispute(uint256 escrowId)`  
+- `function raiseDispute(uint256 escrowId) external`  
   Client or freelancer marks escrow as disputed.
 
-- `resolveDispute(uint256 escrowId, bool favorFreelancer)`  
-  Arbitrator resolves the dispute.
+- `function resolveDispute(uint256 escrowId, bool favorFreelancer) external`  
+  Arbitrator resolves dispute, releasing funds to winner.
 
 ### Platform Management
 
-- `withdrawFees()`  
+- `function withdrawFees() external`  
   Platform wallet withdraws accumulated fees.
 
-- `setPlatformFee(uint16 newFee)`
-- `setPlatformWallet(address newWallet)`
-- `setArbitrator(address newArbitrator)`
+- `function setPlatformFee(uint16 newFee) external`
+- `function setPlatformWallet(address newWallet) external`
+- `function setArbitrator(address newArbitrator) external`
 
 ---
 
 ## 📢 Events
 
-- `EscrowCreated(uint256 indexed id, address indexed client, address indexed freelancer, uint256 amount, address token, uint256 deadline)`
-- `EscrowReleased(uint256 indexed id, address indexed freelancer, uint256 amount)`
-- `EscrowDisputed(uint256 indexed id)`
-- `EscrowResolved(uint256 indexed id, address winner, uint256 amount)`
-- `FeeWithdrawn(address indexed to, uint256 amount)`
+- `event EscrowCreated(uint256 indexed id, address indexed client, address indexed freelancer, uint256 amount, address token, uint256 deadline);`
+- `event EscrowReleased(uint256 indexed id, address indexed freelancer, uint256 amount);`
+- `event EscrowDisputed(uint256 indexed id);`
+- `event EscrowResolved(uint256 indexed id, address winner, uint256 amount);`
+- `event FeeWithdrawn(address indexed to, uint256 amount);`
 
 ---
 
@@ -94,36 +93,36 @@ struct Escrow {
 
 1. Client calls `createEscrow()` and deposits funds.
 2. Freelancer delivers work.
-3. Client calls `releaseEscrow()`; freelancer gets paid.
+3. Client calls `releaseEscrow()`; freelancer receives payment.
 
 ### Auto-Release Flow
 
-1. Client creates escrow with a 7-day deadline.
+1. Client creates escrow with a deadline.
 2. Freelancer delivers work.
 3. Client does not confirm.
-4. After 7 days, anyone can call `autoRelease()`; freelancer gets paid.
+4. After deadline, anyone calls `autoRelease()`; freelancer receives payment.
 
 ### Dispute Flow
 
 1. Client or freelancer calls `raiseDispute()`.
 2. Arbitrator investigates off-chain.
-3. Arbitrator calls `resolveDispute()`; funds go to the winner.
+3. Arbitrator calls `resolveDispute()`; funds released to winner.
 
 ---
 
 ## 🔒 Security Considerations
 
-- Use `ReentrancyGuard` for fund releases.
-- Validate that ETH amount matches the required deposit.
-- Ensure escrow cannot be released more than once.
-- Dispute resolution only callable by the arbitrator.
+- Uses `ReentrancyGuard` for fund releases.
+- Validates ETH deposit matches required amount.
+- Prevents double release of escrow.
+- Only arbitrator can resolve disputes.
 - Platform fees are capped (e.g., max 10%).
 
 ---
 
 ## 📚 Potential Extensions
 
-- NFT escrow (escrow NFT ownership until conditions are met)
-- Multi-signature approval (both parties must sign release)
+- NFT escrow (escrow NFT ownership until conditions met)
+- Multi-signature approval (both parties sign release)
 - Partial payments (milestone-based escrow)
-- DAO-governed arbitration
+- DAO-
