@@ -7,7 +7,7 @@ contract DecentralizedEscrow is ReentrancyGuard {
     error Client__AlreadeyHaveAccount();
     error Freelancer__AlreadeyHaveAccount();
     error Client__CreateProject();
-    
+
     error Client__DeadLine();
     error Client__Balance();
     error Client__RoleNotMatch();
@@ -81,7 +81,7 @@ contract DecentralizedEscrow is ReentrancyGuard {
         if (rol == uint8(Role.Client)) {
             registerAsClient();
             emit UserRegistered(msg.sender, block.timestamp, Role.Client);
-        } else {
+        } else if (rol == uint8(Role.Freelancer)) {
             registerAsFreelancer();
             emit UserRegistered(msg.sender, block.timestamp, Role.Freelancer);
         }
